@@ -1,5 +1,5 @@
 ---
-title: "APM466 A1 Yield Curve"
+title: "A1"
 author: "Catherine Jiang"
 date: '2024-01-21'
 output: html_document
