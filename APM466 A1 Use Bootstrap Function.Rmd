@@ -1,0 +1,392 @@
+---
+title: "APM466 A1 Yield Curve"
+author: "Catherine Jiang"
+date: '2024-01-21'
+output: html_document
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(readxl)
+data <- read_excel("C:/Users/xinxi/OneDrive/Desktop/APM466/A1/A1 Ten Bonds Data.xlsx")
+```
+### 4b) Spot Curve
+```{r}
+# Dirty Prices
+## ON Jan.8, Number of Days since the last coupon payment is:
+NDLCPN = round(difftime("2024-01-08", "2023-09-01", units = "days"))
+DP <- vector(length = 11)
+for (i in 1:11) {
+  DP[i] <- NDLCPN/365*(100*data$COUPON[i]) + data$Jan.8[i]
+}
+
+# Create a list to hold the dirty prices for the 10 dates
+DP_list <- list()
+DP_list[[1]] <- DP
+
+# Continue with Jan.9, and so on
+NDLCPN = NDLCPN+1
+for (i in 1:11) {
+  DP[i] <- NDLCPN/365*(100*data$COUPON[i]) + data$Jan.9[i]}
+DP_list[[2]] <- DP
+
+NDLCPN = NDLCPN+1
+for (i in 1:11) {
+  DP[i] <- NDLCPN/365*(100*data$COUPON[i]) + data$Jan.10[i]}
+DP_list[[3]] <- DP
+
+NDLCPN = NDLCPN+1
+for (i in 1:11) {
+  DP[i] <- NDLCPN/365*(100*data$COUPON[i]) + data$Jan.11[i]}
+DP_list[[4]] <- DP
+
+NDLCPN = NDLCPN+1
+for (i in 1:11) {
+  DP[i] <- NDLCPN/365*(100*data$COUPON[i]) + data$Jan.12[i]}
+DP_list[[5]] <- DP
+
+NDLCPN = NDLCPN+3
+for (i in 1:11) {
+  DP[i] <- NDLCPN/365*(100*data$COUPON[i]) + data$Jan.15[i]}
+DP_list[[6]] <- DP
+
+NDLCPN = NDLCPN+1
+for (i in 1:11) {
+  DP[i] <- NDLCPN/365*(100*data$COUPON[i]) + data$Jan.16[i]}
+DP_list[[7]] <- DP
+
+NDLCPN = NDLCPN+1
+for (i in 1:11) {
+  DP[i] <- NDLCPN/365*(100*data$COUPON[i]) + data$Jan.17[i]}
+DP_list[[8]] <- DP
+
+NDLCPN = NDLCPN+1
+for (i in 1:11) {
+  DP[i] <- NDLCPN/365*(100*data$COUPON[i]) + data$Jan.18[i]}
+DP_list[[9]] <- DP
+
+NDLCPN = NDLCPN+1
+for (i in 1:11) {
+  DP[i] <- NDLCPN/365*(100*data$COUPON[i]) + data$Jan.19[i]}
+DP_list[[10]] <- DP
+
+# Each semi-annual coupon payment for face value 100 is:
+CPN = 100*data$COUPON/2
+```
+
+```{r}
+# Time to maturity of the bonds at Jan 8th:
+TM <- vector(length = 11)
+for (i in 1:11) {
+  TM[i] <- round(difftime(data$"MATURITY DATE"[i], "2024-01-08", units = "days"))
+}
+
+# Create a list to hold all time to maturities for the 10 dates.
+TMY <- list()
+TMY[[1]] <- TM/365 # Time to Maturity in Years, on Jan.8
+
+# On Jan.9, and so on:
+TM = TM-1
+TMY[[2]] <- TM/365
+TM = TM-1
+TMY[[3]] <- TM/365
+TM = TM-1
+TMY[[4]] <- TM/365
+TM = TM-1
+TMY[[5]] <- TM/365
+
+TM = TM-3
+TMY[[6]] <- TM/365
+TM = TM-1
+TMY[[7]] <- TM/365
+TM = TM-1
+TMY[[8]] <- TM/365
+TM = TM-1
+TMY[[9]] <- TM/365
+TM = TM-1
+TMY[[10]] <- TM/365
+```
+
+
+```{r}
+ZeroRates <- list()
+for (i in 1:10){
+  
+  get_zero_coupon <- function(coupon=CPN,BondPrices=DP_list[[i]], maturity = TMY[[i]]){
+    
+    price_matrix <- matrix(0,nrow=length(coupon),ncol=length(coupon))
+
+    #Assign the coupons for each year
+    for(j in 1:length(coupon)){
+        price_matrix[j,1:j] <- coupon[j]
+    }
+
+    #Add face value at maturity
+    diag(price_matrix) <- diag(price_matrix) + 100
+
+    #Solve the system of equations to get B(0,t)
+    zero_coupon_prices<-solve(price_matrix,BondPrices)
+
+    #Get zero coupon yields R(0,t)
+    zero_coupon_yields <- (1/zero_coupon_prices)^(1/maturity)-1
+
+    return(zero_coupon_yields)
+  }
+  ZeroRates[[i]] <- 100 * get_zero_coupon() # Convert to %
+}
+
+ZeroRates
+```
+
+
+```{r}
+Zero_df <- data.frame(ZeroRates) # Convert to %
+colnames(Zero_df) <- c("Jan.8", "Jan.9", "Jan.10", "Jan.11", "Jan.12", "Jan.15", "Jan.16", "Jan.17", "Jan.18", "Jan.19")
+View(Zero_df)
+```
+
+
+Creating the Yield Curve:
+```{r}
+par(mar=c(4.5, 4, 4, 2), mgp=c(2, 0.8, 0))
+
+pdf("Spot Curve.pdf", width = 7, height = 4)
+
+plot(TMY[[1]], ZeroRates[[1]], type = "l", col = "red",
+     xlab = "Time (Years)", ylab = "Yield (%)", xlim = c(0,5), ylim = c(3.2, 5),
+     main = "5-Year Spot Curve")
+lines(TMY[[2]], ZeroRates[[2]], col = "orange")
+lines(TMY[[3]], ZeroRates[[3]], col = "yellow")
+lines(TMY[[4]], ZeroRates[[4]], col = "green")
+lines(TMY[[5]], ZeroRates[[5]], col = "steelblue")
+
+lines(TMY[[6]], ZeroRates[[6]], col = "cyan")
+lines(TMY[[7]], ZeroRates[[7]], col = "blue")
+lines(TMY[[8]], ZeroRates[[8]], col = "purple")
+lines(TMY[[9]], ZeroRates[[9]], col = "palevioletred")
+lines(TMY[[10]], ZeroRates[[10]], col = "darkred")
+
+grid(nx = NULL, ny = NULL, col = "gray", lty = "dotted")
+
+legend("topright", legend = c("Jan.8 Data", "Jan.9 Data", "Jan.10 Data", "Jan.11 Data", "Jan.12 Data", "Jan.15 Data", "Jan.16 Data", "Jan.17 Data", "Jan.18 Data", "Jan.19 Data"), 
+       col = c("red", "orange", "yellow", "green", "steelblue", "cyan", "blue", "purple", "palevioletred", "darkred"),
+       lty = 1, cex = 0.7) 
+
+dev.off()
+```
+
+### 4c) Forward Rates
+```{r}
+# First, we obtain the i year spot rate, where i = 1,2,3,4,5
+interpolated_spots_list <- list()
+for (i in 1:10){
+  interpolated_spots_list[[i]] <- vector(length = 5)
+  for (j in 1:5){
+    interpolated_spots_list[[i]][j] <- approx(TMY[[i]], ZeroRates[[i]], xout = j)$y}
+}
+```
+
+
+```{r}
+# Assume continuous compounding.
+# Use the spot rates to calculate forward rates: f_{1,t} = (r_{1,t} * t - r1)/(t-1), where t ranges from 2 to 5.
+forward_list <- list()
+for (i in 1:10){
+  forward_list[[i]] <- vector(length = 4)
+  for (t in 1:4){
+    forward_list[[i]][t] = ((t+1) * interpolated_spots_list[[i]][t+1] - interpolated_spots_list[[i]][1]) / (t)}
+}
+```
+
+```{r}
+par(mar=c(4.5, 4, 4, 2), mgp=c(2, 0.8, 0))
+
+pdf("Forward Curve.pdf", width = 7, height = 3.8)
+
+Terms = c("1yr-1yr", "1yr-2yr" ,"1yr-3yr", "1yr-4yr")
+plot(1:4, forward_list[[1]], type = "l", col = "red", xaxt = 'n',
+     xlab = "Time (Years)", ylab = "Forward Rates (%)", xlim = c(1, 4.5), ylim = c(2.2, 3.6),
+     main = "1-Year Forward Curve with Terms Ranging from 2-5 years")
+axis(1, at = 1:4, labels = Terms)
+
+lines(1:4, forward_list[[2]], col = "orange")
+lines(1:4, forward_list[[3]], col = "yellow")
+lines(1:4, forward_list[[4]], col = "green")
+lines(1:4, forward_list[[5]], col = "steelblue")
+
+lines(1:4, forward_list[[6]], col = "cyan")
+lines(1:4, forward_list[[7]], col = "blue")
+lines(1:4, forward_list[[8]], col = "purple")
+lines(1:4, forward_list[[9]], col = "palevioletred")
+lines(1:4, forward_list[[10]], col = "darkred")
+
+grid(nx = NULL, ny = NULL, col = "gray", lty = "dotted")
+
+legend("bottomright", legend = c("Jan.8 Data", "Jan.9 Data", "Jan.10 Data", "Jan.11 Data", "Jan.12 Data", "Jan.15 Data", "Jan.16 Data", "Jan.17 Data", "Jan.18 Data", "Jan.19 Data"), col = c("red", "orange", "yellow", "green", "steelblue", "cyan", "blue", "purple", "palevioletred", "darkred"),
+       lty = 1, cex = 0.6) 
+
+dev.off()
+```
+
+
+
+### 4a) YTM Curve
+```{r}
+library(jrvFinance)
+
+Dates = c("2024-01-08", "2024-01-09", "2024-01-10", "2024-01-11", "2024-01-12",
+          "2024-01-15", "2024-01-16", "2024-01-17", "2024-01-18", "2024-01-19")
+
+YTM8 <- vector(length = 11)
+for (i in 1:11){
+  YTM8[i] = 100 * bond.yield(settle = Dates[1], mature = data$"MATURITY DATE"[i],
+  coupon = data$COUPON[i], freq = 2, price = data$Jan.8[i], 
+  convention = "ACT/ACT", comp.freq = 2, redemption_value = 100)}
+YTM9 <- vector(length = 11)
+for (i in 1:11){
+  YTM9[i] = 100 * bond.yield(settle = Dates[2], mature = data$"MATURITY DATE"[i],
+  coupon = data$COUPON[i], freq = 2, price = data$Jan.9[i], 
+  convention = "ACT/ACT", comp.freq = 2, redemption_value = 100)}
+YTM10 <- vector(length = 11)
+for (i in 1:11){
+  YTM10[i] = 100 * bond.yield(settle = Dates[3], mature = data$"MATURITY DATE"[i],
+  coupon = data$COUPON[i], freq = 2, price = data$Jan.10[i], 
+  convention = "ACT/ACT", comp.freq = 2, redemption_value = 100)}
+YTM11 <- vector(length = 11)
+for (i in 1:11){
+  YTM11[i] = 100 * bond.yield(settle = Dates[4], mature = data$"MATURITY DATE"[i],
+  coupon = data$COUPON[i], freq = 2, price = data$Jan.11[i], 
+  convention = "ACT/ACT", comp.freq = 2, redemption_value = 100)}
+YTM12 <- vector(length = 11)
+for (i in 1:11){
+  YTM12[i] = 100 * bond.yield(settle = Dates[5], mature = data$"MATURITY DATE"[i],
+  coupon = data$COUPON[i], freq = 2, price = data$Jan.12[i], 
+  convention = "ACT/ACT", comp.freq = 2, redemption_value = 100)}
+```
+
+```{r}
+YTM15 <- vector(length = 11)
+for (i in 1:11){
+  YTM15[i] = 100 * bond.yield(settle = Dates[6], mature = data$"MATURITY DATE"[i],
+  coupon = data$COUPON[i], freq = 2, price = data$Jan.15[i], 
+  convention = "ACT/ACT", comp.freq = 2, redemption_value = 100)}
+YTM16 <- vector(length = 11)
+for (i in 1:11){
+  YTM16[i] = 100 * bond.yield(settle = Dates[7], mature = data$"MATURITY DATE"[i],
+  coupon = data$COUPON[i], freq = 2, price = data$Jan.16[i], 
+  convention = "ACT/ACT", comp.freq = 2, redemption_value = 100)}
+YTM17 <- vector(length = 11)
+for (i in 1:11){
+  YTM17[i] = 100 * bond.yield(settle = Dates[8], mature = data$"MATURITY DATE"[i],
+  coupon = data$COUPON[i], freq = 2, price = data$Jan.17[i], 
+  convention = "ACT/ACT", comp.freq = 2, redemption_value = 100)}
+YTM18 <- vector(length = 11)
+for (i in 1:11){
+  YTM18[i] = 100 * bond.yield(settle = Dates[9], mature = data$"MATURITY DATE"[i],
+  coupon = data$COUPON[i], freq = 2, price = data$Jan.18[i], 
+  convention = "ACT/ACT", comp.freq = 2, redemption_value = 100)}
+YTM19 <- vector(length = 11)
+for (i in 1:11){
+  YTM19[i] = 100 * bond.yield(settle = Dates[10], mature = data$"MATURITY DATE"[i],
+  coupon = data$COUPON[i], freq = 2, price = data$Jan.19[i], 
+  convention = "ACT/ACT", comp.freq = 2, redemption_value = 100)}
+```
+
+```{r}
+YTMdf <- data.frame(YTM8, YTM9, YTM10, YTM11, YTM12, YTM15, YTM16, YTM17, YTM18, YTM19)
+colnames(YTMdf) <- c("Jan.8", "Jan.9", "Jan.10", "Jan.11", "Jan.12", "Jan.15", "Jan.16", "Jan.17", "Jan.18", "Jan.19")
+View(YTMdf)
+```
+
+Creating the YTM Curve:
+```{r}
+pdf("YTM Curve.pdf", width = 7, height = 3.8)
+
+par(mar=c(4.5, 4, 4, 2), mgp=c(3, 0.8, 0))
+plot(TMY[[1]], YTM8, type = "l", col = "red",
+     xlab = "Time (Years)", ylab = "Yield To Maturity (%)", xlim = c(0, 5), ylim = c(3.2, 5),
+     main = "5-Year YTM Curve")
+lines(TMY[[2]], YTM9, col = "orange")
+lines(TMY[[3]], YTM10, col = "yellow")
+lines(TMY[[4]], YTM11, col = "green")
+lines(TMY[[5]], YTM12, col = "steelblue")
+
+lines(TMY[[6]], YTM15, col = "cyan")
+lines(TMY[[7]], YTM16, col = "blue")
+lines(TMY[[8]], YTM17, col = "purple")
+lines(TMY[[9]], YTM18, col = "palevioletred")
+lines(TMY[[10]], YTM19, col = "darkred")
+
+grid(nx = NULL, ny = NULL, col = "gray", lty = "dotted")
+
+legend("topright", legend = c("Jan.8 Data", "Jan.9 Data", "Jan.10 Data", "Jan.11 Data", "Jan.12 Data", "Jan.15 Data", "Jan.16 Data", "Jan.17 Data", "Jan.18 Data", "Jan.19 Data"), 
+       col = c("red", "orange", "yellow", "green", "steelblue", "cyan", "blue", "purple", "palevioletred", "darkred"),
+       lty = 1, cex = 0.7)
+
+dev.off()
+```
+
+
+### 5
+First, create a matrix made of the time series $X_{i,j} =log(r_{i,j+1}/r_{i,j})$, where i = 1,...5 are the years and j = 1,...,9 corresponds to the dates Jan.8 to Jan.19.
+```{r}
+# Daily_Log_Returns matrix: each column is a random variable X_i
+X <- matrix(nrow = 9, ncol = 5)
+for (j in 1:9){
+  for (i in 1:5){
+    X[j,i] = log(interpolated_spots_list[[j+1]][i] / interpolated_spots_list[[j]][i])}
+}
+CovX <- cov(X)
+CovX
+
+knitr::kable(CovX, format = "latex")
+```
+
+Similarly, for the 4 forward rates:
+```{r}
+# Forward rates matrix
+Xforward <- matrix(nrow = 9, ncol = 4)
+for (j in 1:9){
+  for (i in 1:4){
+    Xforward[j,i] = log(forward_list[[j+1]][i] / forward_list[[j]][i])}
+}
+CovXforward <- cov(Xforward)
+CovXforward
+knitr::kable(CovXforward, format = "latex")
+```
+
+
+### 6
+```{r}
+eigen(CovX)
+
+eigenX <- eigen(CovX)
+eigenX_table <- rbind(Eigenvalues = eigenX$values, eigenX$vectors)
+knitr::kable(eigenX_table, format = "latex")
+
+# Explained variance in %
+Sum = sum(eigenX$values)
+print(eigenX$values/Sum*100)
+```
+
+```{r}
+eigen(CovXforward)
+eigenXforward <- eigen(CovXforward)
+eigenXforward_table <- rbind(Eigenvalues = eigenXforward$values, eigenXforward$vectors)
+knitr::kable(eigenXforward_table, format = "latex")
+# Explained variance in %
+print(eigenXforward$values / sum(eigenXforward$values)*100)
+```
+
+
+
+
+
+
+
+
+
+
+
